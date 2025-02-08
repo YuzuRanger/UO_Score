@@ -20,17 +20,18 @@ length_last_name <- 15 # Maximum length of last name entry
 length_first_name <- 10 # Maximum length of first name entry
 
 # Set Exam Specific Parameters
-input_file_name_path <- "Spring2024_FinalExam.pdf" # Location of single pdf file holding scanned forms to be processed. One page per form
-output_image_path <- "~/Library/CloudStorage/Dropbox/Work/Computing/UOScore_Scantron_Grading/scanned_forms" # Location of directory to hold scanned image of each processed form
+input_file_name_path <- "./Input_UO_Score/Midterm 1 Scantrons.pdf" # Location of single pdf file holding scanned forms to be processed. One page per form
+output_image_path <- "./Output_UO_Score/individual_form_scans" # Location of directory to hold scanned image of each processed form
+output_file_path <- "./Output_UO_Score/Recorded_Scantron_Output.csv"
 num_forms <- pdf_info(input_file_name_path)$pages # Number of exams to be graded. Assumes one scanned form per page in pdf file
-num_questions <- 70 # Number of questions on the exam, must be 120 or less
+num_questions <- 50 # Number of questions on the exam, must be 120 or less
 blank_threshold <- 0.10  # Threshold to detect blanks - must be between 0 and 1. 
                         # Lower numbers will detect less blanks, but may assign a random answer when none is given.
                         # Higher numbers will detect more blanks, but may miss more legitimate answers
 mult_answer_threshold <- 0.05  # Threshold to detect multiple answers
                               # Lower numbers will detect less multiple answers
                               # Higher numbers will detect more multiple answers
-fail_file <- "Forms_Not_Processed.txt" # Name of file to output forms that were not processed for various reasons
+fail_file <- "./Output_UO_Score/Forms_Not_Processed.txt" # Name of file to output forms that were not processed for various reasons
 
 # Initialize storage matrix
 num_rows <- num_ident_fields + num_questions; 
@@ -45,6 +46,7 @@ mark_identify <- function(row_start,row_end,col_start,col_end,study_image,thresh
 }
 
 form_count <- 0 # counter to count the number of forms processed. Useful if processing a subset of main file. 
+successful_form_count <- 0 # counter to count the number of forms sucessfully processed.
 
 for (page_num in 1:num_forms) { 
 
@@ -344,17 +346,23 @@ for (page_num in 1:num_forms) {
   
   image_write(image, output_file)
   
-  file.remove("temp.png")
+ # file.remove("temp.png")
   
+  successful_form_count = successful_form_count+1
+
 }
+
+file.remove("temp.png")
 
 store_vec_labels <- as.matrix(c("Last_Name", "First_Name", "Student_ID", "Form Number", (1:1:num_questions)))
 store_mat <- t(store_mat)
 store_mat <- as.data.frame(store_mat);
 names(store_mat) <- t(store_vec_labels)
 
-write.csv(store_mat, "Graded_Scantron_Output.csv", row.names = FALSE)
+write.csv(store_mat, output_file_path, row.names = FALSE)
 
+print_update1 <- paste("Processing Complete.", form_count, "forms attempted to be processed.")
+print_update2 <- paste("There were", form_count-successful_form_count, "forms unable to be processed.")
 cat(rep("\n", 100))
-print_update <- paste("Processing Complete.", form_count, "forms processed.")
-print(print_update)
+print(print_update1)
+print(print_update2)
