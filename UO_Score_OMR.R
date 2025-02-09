@@ -31,7 +31,7 @@ blank_threshold <- 0.10  # Threshold to detect blanks - must be between 0 and 1.
 mult_answer_threshold <- 0.05  # Threshold to detect multiple answers
                               # Lower numbers will detect less multiple answers
                               # Higher numbers will detect more multiple answers
-fail_file <- "./Output_UO_Score/Forms_Not_Processed.txt" # Name of file to output forms that were not processed for various reasons
+fail_file_path <- "./Output_UO_Score/Forms_Not_Processed.txt" # Name of file to output forms that were not processed for various reasons
 
 # Initialize storage matrix
 num_rows <- num_ident_fields + num_questions; 
@@ -84,14 +84,14 @@ for (page_num in 1:num_forms) {
   check_col_min <- sum(as.numeric((gray_image_EBImage[col_min,1:H]<threshold)))
   if (check_col_min>25) {
     print_update <- paste("col_min may not contain all guides for form", page_num)
-    write(print_update,file=fail_file,append=TRUE)
+    write(print_update,file=fail_file_path,append=TRUE)
     next
   }
   
   check_col_max <- sum(as.numeric((gray_image_EBImage[col_max,1:H]<threshold)))
   if (check_col_max>25) {
     print_update <- paste("col_max may not contain all guides, or may include other parts of form, for form", page_num)
-    write(print_update,file=fail_file,append=TRUE)
+    write(print_update,file=fail_file_path,append=TRUE)
     next
   }
   
@@ -133,7 +133,7 @@ for (page_num in 1:num_forms) {
   
   if (num_guides != 61) {
     print_update <- paste("Wrong number of guides detected in form", page_num)
-    write(print_update,file=fail_file,append=TRUE)
+    write(print_update,file=fail_file_path,append=TRUE)
     break
   }
   
