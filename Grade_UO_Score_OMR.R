@@ -123,6 +123,9 @@ for (i in 1:dim(Student_Answers)[1]) {
         print_update = paste0("Probable wrong version selected by ",print_name," Score with selected version number ",form_i," was ",score_i,"."," Score with version number ",max_form_i," was ",max_score_i,".")
         write(print_update,file=wrong_form,append=TRUE)
         write("",file=wrong_form,append=TRUE)
+        
+        score_i = max_score_i
+        
       }
         
     }
