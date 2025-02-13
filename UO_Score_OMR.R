@@ -1,4 +1,6 @@
 # R script to identify and record marks on the UO Score Answer form
+# Jeremy Piger
+# Most recent version available at: https://github.com/jpiger/UO_Score
 
 # Clear Environment and Console
 rm(list = ls())
@@ -9,9 +11,10 @@ library(magick)
 library(EBImage)
 library(pdftools)
 library(collapse)
+library(svDialogs)
 
 # Set Parameters for UO Score Answer Form
-num_ident_fields <- 4 # Assumes Last Name, First Name, UO Student ID, and Form Version Number is Captured 
+num_ident_fields <- 5 # Assumes page number, Last Name, First Name, UO Student ID, and Form Version Number is Captured 
 length_SID <- 9 # Length of UO Student ID
 length_form_number <- 2 # Maximum number of digits in form version number
 length_question_option <- 5 # Maximum Number of MC Question Options
@@ -20,18 +23,40 @@ length_last_name <- 15 # Maximum length of last name entry
 length_first_name <- 10 # Maximum length of first name entry
 
 # Set Exam Specific Parameters
-input_file_name_path <- "./Input_UO_Score/Midterm 1 Scantrons.pdf" # Location of single pdf file holding scanned forms to be processed. One page per form
-output_image_path <- "./Output_UO_Score/individual_form_scans" # Location of directory to hold scanned image of each processed form
-output_file_path <- "./Output_UO_Score/Recorded_Scantron_Output.csv"
+dlgMessage(paste("Select .pdf file that holds scans of forms - press OK to browse for file."))$res
+input_file_name_path = file.choose() # Location of single pdf file holding scanned forms to be processed. One page per form
+
+dlgMessage(paste("Choose location and name for .csv file that will hold recorded student responses - press OK to browse."))$res
+output_file_name_path <- file.choose(new=TRUE)
+output_file_name_path = paste0(output_file_name_path,".csv")
+
+dlgMessage(paste("Choose location and name for .txt file that will record any forms that can't be processed - press OK to browse."))$res
+fail_file_name_path <- file.choose(new=TRUE)
+fail_file_name_path = paste0(fail_file_name_path,".txt")
+
 num_forms <- pdf_info(input_file_name_path)$pages # Number of exams to be graded. Assumes one scanned form per page in pdf file
-num_questions <- 50 # Number of questions on the exam, must be 120 or less
+num_questions <- dlg_input(message = "Enter number of questions on the exam, must be 120 or less")
+num_questions = as.numeric(num_questions$res)  
 blank_threshold <- 0.10  # Threshold to detect blanks - must be between 0 and 1. 
                         # Lower numbers will detect less blanks, but may assign a random answer when none is given.
                         # Higher numbers will detect more blanks, but may miss more legitimate answers
 mult_answer_threshold <- 0.05  # Threshold to detect multiple answers
                               # Lower numbers will detect less multiple answers
                               # Higher numbers will detect more multiple answers
-fail_file_path <- "./Output_UO_Score/Forms_Not_Processed.txt" # Name of file to output forms that were not processed for various reasons
+fail_list <- list() # List to hold forms that were not processed for various reasons
+
+save_individual_image <- dlg_message(message="Do you want to save individual image files of each student's form? Warning: This could create a large number of files.", type="yesno")
+save_individual_image <- save_individual_image$res
+
+# Location of directory to hold scanned image of each processed form
+if (save_individual_image=="yes") {
+  root_dir="."
+  output_dir = "individual_images"
+  output_image_path <- file.path(root_dir,output_dir)
+  if (file.exists(output_dir)=="FALSE") {
+    dir.create(output_image_path)
+  }
+}
 
 # Initialize storage matrix
 num_rows <- num_ident_fields + num_questions; 
@@ -48,7 +73,7 @@ mark_identify <- function(row_start,row_end,col_start,col_end,study_image,thresh
 form_count <- 0 # counter to count the number of forms processed. Useful if processing a subset of main file. 
 successful_form_count <- 0 # counter to count the number of forms sucessfully processed.
 
-for (page_num in 1:num_forms) { 
+for (page_num in 1:num_forms) {
 
   form_count <- form_count + 1
   
@@ -84,14 +109,16 @@ for (page_num in 1:num_forms) {
   check_col_min <- sum(as.numeric((gray_image_EBImage[col_min,1:H]<threshold)))
   if (check_col_min>25) {
     print_update <- paste("col_min may not contain all guides for form", page_num)
-    write(print_update,file=fail_file_path,append=TRUE)
+    fail_list = rbind(fail_list,print_update)
+    fail_list = rbind(fail_list,"")
     next
   }
   
   check_col_max <- sum(as.numeric((gray_image_EBImage[col_max,1:H]<threshold)))
   if (check_col_max>25) {
     print_update <- paste("col_max may not contain all guides, or may include other parts of form, for form", page_num)
-    write(print_update,file=fail_file_path,append=TRUE)
+    fail_list = rbind(fail_list,print_update)
+    fail_list = rbind(fail_list,"")
     next
   }
   
@@ -133,7 +160,8 @@ for (page_num in 1:num_forms) {
   
   if (num_guides != 61) {
     print_update <- paste("Wrong number of guides detected in form", page_num)
-    write(print_update,file=fail_file_path,append=TRUE)
+    fail_list = rbind(fail_list,print_update)
+    fail_list = rbind(fail_list,"")
     break
   }
   
@@ -339,14 +367,13 @@ for (page_num in 1:num_forms) {
     
   }
   
-  store_vec <- as.matrix(c(Last_Name_str, First_Name_str, SID_number_onenum, Form_number_onenum, Answers))
+  store_vec <- as.matrix(c(form_count,Last_Name_str, First_Name_str, SID_number_onenum, Form_number_onenum, Answers))
   store_mat <- cbind(store_mat, store_vec)
   
-  output_file <- file.path(output_image_path, paste0(Last_Name_str, "_", First_Name_str, "_", SID_number_onenum, ".png"))
-  
-  image_write(image, output_file)
-  
- # file.remove("temp.png")
+  if (save_individual_image=="yes") {
+    output_file <- file.path(output_image_path, paste0(Last_Name_str, "_", First_Name_str, "_", SID_number_onenum, ".png"))
+    image_write(image, output_file)
+  }
   
   successful_form_count = successful_form_count+1
 
@@ -354,12 +381,16 @@ for (page_num in 1:num_forms) {
 
 file.remove("temp.png")
 
-store_vec_labels <- as.matrix(c("Last_Name", "First_Name", "Student_ID", "Form Number", (1:1:num_questions)))
+store_vec_labels <- as.matrix(c("Page_Number","Last_Name", "First_Name", "Student_ID", "Form Number", (1:1:num_questions)))
 store_mat <- t(store_mat)
 store_mat <- as.data.frame(store_mat);
 names(store_mat) <- t(store_vec_labels)
 
-write.csv(store_mat, output_file_path, row.names = FALSE)
+write.csv(store_mat, output_file_name_path, row.names = FALSE)
+
+if (length(fail_list)!=0){
+  write(unlist(fail_list),fail_file_name_path)
+  }
 
 print_update1 <- paste("Processing Complete.", form_count, "forms attempted to be processed.")
 print_update2 <- paste("There were", form_count-successful_form_count, "forms unable to be processed.")
