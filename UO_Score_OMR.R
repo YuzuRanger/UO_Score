@@ -135,6 +135,13 @@ for (page_num in 1:num_forms) {
   all_dark_coord = all_dark_coord[(all_dark_coord[,1] %in% all_dark_row_counts[,1]),]
   
   unique_row = unique(all_dark_coord[,1])
+  
+  if (length(unique_row)==0) {
+    print_update <- paste("Wrong number of guides detected in form", page_num)
+    fail_list = rbind(fail_list,print_update)
+    fail_list = rbind(fail_list,"")
+    next
+  }
 
   guide_mat_temp <- matrix(NA, length(unique(all_dark_coord[,1])), 4)
   
