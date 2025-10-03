@@ -1,4 +1,4 @@
-3# Grade Exams Based on Output File from UO_Score_OMR.R
+# Grade Exams Based on Output File from UO_Score_OMR.R
 # Jeremy Piger
 # Most recent version available at: https://github.com/jpiger/UO_Score
 
