@@ -1,4 +1,4 @@
-# Grade Exams Based on Output File from UO_Score_OMR.R
+3# Grade Exams Based on Output File from UO_Score_OMR.R
 # Jeremy Piger
 # Most recent version available at: https://github.com/jpiger/UO_Score
 
@@ -32,11 +32,15 @@ Student_Answers = read.csv(Student_Answers_path) # Output file from UO_Score_OMR
 
 dlgMessage(paste("Choose location and name for .csv file that will hold student scores - press OK to browse."))$res
 output_file_name_path <- file.choose(new=TRUE)
-output_file_name_path <- paste0(output_file_name_path,".csv")
+if (!(grepl(".csv", output_file_name_path))) {
+  output_file_name_path = paste0(output_file_name_path,".csv")
+}
 
 dlgMessage(paste("Choose location and name for .txt file that will hold alerts about irregularities in student responses - press OK to browse."))$res
 alert_file_name_path <- file.choose(new=TRUE)
-alert_file_name_path <- paste0(alert_file_name_path,".txt")
+if (!(grepl(".txt", alert_file_name_path))) {
+  alert_file_name_path = paste0(alert_file_name_path,".txt")
+}
 
 blank_list <- list()
 multiple_list <- list()

@@ -28,11 +28,15 @@ input_file_name_path = file.choose() # Location of single pdf file holding scann
 
 dlgMessage(paste("Choose location and name for .csv file that will hold recorded student responses - press OK to browse."))$res
 output_file_name_path <- file.choose(new=TRUE)
-output_file_name_path = paste0(output_file_name_path,".csv")
+if (!(grepl(".csv", output_file_name_path))) {
+  output_file_name_path = paste0(output_file_name_path,".csv")
+}
 
 dlgMessage(paste("Choose location and name for .txt file that will record any forms that can't be processed - press OK to browse."))$res
 fail_file_name_path <- file.choose(new=TRUE)
-fail_file_name_path = paste0(fail_file_name_path,".txt")
+if (!(grepl(".txt", fail_file_name_path))) {
+  fail_file_name_path = paste0(fail_file_name_path,".txt")
+}
 
 num_forms <- pdf_info(input_file_name_path)$pages # Number of exams to be graded. Assumes one scanned form per page in pdf file
 num_questions <- dlg_input(message = "Enter number of questions on the exam, must be 120 or less")
