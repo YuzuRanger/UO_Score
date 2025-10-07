@@ -52,9 +52,9 @@ fail_list <- list() # List to hold forms that were not processed for various rea
 save_individual_image <- dlg_message(message="Do you want to save individual image files of each student's form? Warning: This could create a large number of files.", type="yesno")
 save_individual_image <- save_individual_image$res
 
-# Location of directory to hold scanned image of each processed form
+# Hold scanned image of each processed form in same directory as output for ease of access
 if (save_individual_image=="yes") {
-  root_dir="."
+  root_dir <- dirname(output_file_name_path)
   output_dir = "individual_images"
   output_image_path <- file.path(root_dir,output_dir)
   if (file.exists(output_dir)=="FALSE") {
