@@ -6,12 +6,13 @@ library(EBImage)
 library(pdftools)
 library(collapse)
 library(svDialogs)
+library(stringr)
 
 # Define UI for data upload app ----
 ui <- fluidPage(
   useShinyjs(),
   # App title ----
-  titlePanel("Uploading Files"),
+  titlePanel("Upload Files"),
 
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
@@ -27,15 +28,31 @@ ui <- fluidPage(
       # Input: Enter an integer ----
       numericInput(
                 inputId = "num_questions", 
-                label = "Enter number of questions on the exam, must be 120 or less:", 
+                label = "Enter number of questions on the exam, must be 120 or less:",
                 value = 10, 
                 min = 1, 
                 max = 120, 
                 step = 1
             ),
 
+          # Input: Enter an integer ----
+      numericInput(
+                inputId = "num_versions", 
+                label = "Enter the number of test versions:",
+                value = 1, 
+                min = 1, 
+                max = 10, 
+                step = 1
+            ),
+    
+          # Input: Select a file ----
+      fileInput("answer_key", "Select .csv file that holds answer key for exam:",
+                multiple = FALSE,
+                accept = c(".csv")),
+
       # Horizontal line ----
       tags$hr(),
+      
 
       # Button
       actionButton("processData", "Process Data")
@@ -46,7 +63,9 @@ ui <- fluidPage(
     mainPanel(
       verbatimTextOutput("updates"),
       textOutput("fail_list"),
-      shinyjs::hidden(downloadButton("downloadData", "Download Processed Data"))
+      shinyjs::hidden(downloadButton("downloadData", "Download Processed Student Answers")),
+      shinyjs::hidden(downloadButton("downloadScores", "Download Processed Student Scores")),
+      shinyjs::hidden(downloadButton("downloadAlerts", "Download Alerts/Irregularities in Student Responses"))
 
     )
 
@@ -54,13 +73,15 @@ ui <- fluidPage(
 )
 
 # Define server logic to read selected file ----
-server <- function(input, output) {
-
+server <- function(input, output, session) {
+  options(shiny.maxRequestSize=30*1024^2)
     # input$scanned_pdf will be NULL initially. 
     # Require file and number of questions
     observeEvent(input$processData, {
     req(input$scanned_pdf)
     req(input$num_questions)
+    req(input$answer_key)
+    req(input$num_versions)
 
     shinyjs::html(id = "updates", html = "Starting...", add = TRUE)
     shinyjs::html(id = "updates", html = "<br>", add = TRUE)
@@ -431,16 +452,202 @@ server <- function(input, output) {
     store_mat <- as.data.frame(store_mat);
     names(store_mat) <- t(store_vec_labels)
 
-    shinyjs::show("downloadData")
     # Downloadable csv of dataset ----
-      output$downloadData <- downloadHandler(
-        filename = function() {
+    temp_file <- tempfile(fileext = ".csv")
+    write.csv(store_mat, temp_file, row.names = FALSE)
+    # Store the path to the saved file (e.g., in a reactive value)
+    # for later reading or downloading
+    session$userData$saved_file_path <- temp_file
+
+    output$downloadData <- downloadHandler(
+    filename = function() {
         paste("StudentAnswers", Sys.Date(), ".csv", sep = "")
         },
-        content = function(file) {
-        write.csv(store_mat, file, row.names = FALSE)
+    content = function(file) {
+        file.copy(session$userData$saved_file_path, file)
         }
     )
+
+    # --- BEGIN GRADING ---
+    shinyjs::html(id = "updates", html = "Computing scores...", add = TRUE)
+    num_versions <- as.numeric(input$num_versions)
+    if (num_versions>1) {
+        version_numbers = t((1:1:num_versions))
+    }
+
+    Answer_Key_path <- input$answer_key$datapath
+    Answer_Key = read.csv(Answer_Key_path) # Assumes first column holds questions numbers and each subsequent column is solutions for a particular form
+    Answer_Key = as.data.frame(Answer_Key[,2:(num_versions+1)])
+
+    Student_Answers_path = session$userData$saved_file_path
+    Student_Answers = read.csv(Student_Answers_path) # Output file from UO_Score_OMR.R
+
+
+
+blank_list <- list()
+multiple_list <- list()
+
+if (num_versions>1) {
+  wrong_form_list = list()
+  no_form_list = list()
+}
+
+# Initialize storage matrix
+store_grades <- matrix(nrow=dim(Student_Answers)[1],ncol=4)
+
+for (i in 1:dim(Student_Answers)[1]) {
+  
+  answers_i = t(Student_Answers[i,6:(dim(Student_Answers)[2])])
+  page_number_i = Student_Answers[i,1]
+  last_name_i = Student_Answers[i,2]
+  first_name_i  = Student_Answers[i,3]
+  sid_i = Student_Answers[i,4]
+
+  if ("BLANK" %in% answers_i) {
+    blank_answers <- which(answers_i=="BLANK")
+    print_answers <- paste(blank_answers,collapse=",")
+    print_name <- paste0(last_name_i,", ",first_name_i,", ",sid_i)
+    print_update1 = paste0("Blank answers found for: ",print_name," (page number ", page_number_i,").")
+    print_update2 = paste("Question",print_answers)
+    blank_list = rbind(blank_list,print_update1)
+    blank_list = rbind(blank_list,print_update2)
+    blank_list = rbind(blank_list,"")
+  }
+  
+  if (TRUE %in% (str_length(answers_i)>1)) {
+    mult_answers <- which(str_length(answers_i)>1 & (answers_i!="BLANK"))
+    if (length(mult_answers)>0) {
+      print_answers <- paste(mult_answers,collapse=",")
+      print_name <- paste0(last_name_i,", ",first_name_i,", ",sid_i)
+      print_update1 = paste0("Multiple answers found for: ", print_name, " (page number ", page_number_i, ").")
+      print_update2 = paste("Question",print_answers)
+      multiple_list = rbind(multiple_list,print_update1)
+      multiple_list = rbind(multiple_list,print_update2)
+      multiple_list = rbind(multiple_list,"")
+    }
+  }
+  
+  if (num_versions==1) {
+    key_form_i = as.data.frame(Answer_Key[,1])
+  }
+
+  if (num_versions>1) {
+    form_i = Student_Answers[i,5]
+    
+    if (is.na(form_i)==FALSE) {
+      key_form_i = as.data.frame(Answer_Key[,form_i])
+    }
+    
+    if (is.na(form_i)) {
+      key_form_alli = as.data.frame(Answer_Key)
+      alt_scores = matrix(0,num_versions,2)
+      
+      for (j in 1:num_versions) {
+        
+        scores_alli = sum(answers_i==key_form_alli[,j])
+        alt_scores[j,] = c(scores_alli,j)
+        
+      }
+      
+      max_score_i = max(alt_scores[,1])
+      max_form_i = version_numbers[which.max(alt_scores[,1])]
+      print_name <- paste0(last_name_i,", ",first_name_i,", ",sid_i)
+      print_update1 = paste0("No version selected by ", print_name, " (page number ", page_number_i, ").")
+      print_update2 = paste0("Maximum score was ",max_score_i," with version number ",max_form_i,".")
+      no_form_list = rbind(no_form_list,print_update1)
+      no_form_list = rbind(no_form_list,print_update2)
+      no_form_list = rbind(no_form_list,"")
+      
+      score_i = max_score_i
+      
+      store_grades_i <- as.matrix(c(last_name_i, sid_i, score_i, page_number_i))
+      store_grades[i,] <- t(store_grades_i)
+      
+      next
+      
+    }
+    
+  }
+    
+  score_i = sum(answers_i==key_form_i)
+  
+  if (num_versions>1) {
+    
+    if ((score_i/(dim(answers_i)[1])) < 0.5) {
+        
+      key_form_noti = as.data.frame(Answer_Key[,version_numbers!=form_i])
+        
+      alt_scores = matrix(0,(num_versions-1),2)
+      alt_scores
+      alt_scores[,2] = t(version_numbers[version_numbers!=form_i])
+      alt_scores
+        
+      for (j in 1:(num_versions-1)) {
+          
+        scores_noti = sum(answers_i==key_form_noti[,j])
+        alt_scores[j,1] = c(scores_noti)
+          
+      }
+        
+      if (max(alt_scores[,1])>score_i) {
+        max_score_i = max(alt_scores[,1])
+        max_form_i = alt_scores[which.max(alt_scores[,1]),2]
+        print_name <- paste0(last_name_i,", ",first_name_i,", ",sid_i)
+        print_update1 = paste0("Probable wrong version selected by ",print_name," (Page Number ",page_number_i,").")
+        print_update2 = paste0("Score with selected version number ",form_i," was ",score_i,"."," Score with version number ",max_form_i," was ",max_score_i,".")
+        wrong_form_list = rbind(wrong_form_list,print_update1)
+        wrong_form_list = rbind(wrong_form_list,print_update2)
+        wrong_form_list = rbind(wrong_form_list,"")
+        
+        score_i = max_score_i
+        
+      }
+        
+    }
+      
+  }
+  
+  store_grades_i <- as.matrix(c(last_name_i, sid_i, score_i, page_number_i))
+  store_grades[i,] <- t(store_grades_i)
+    
+}
+
+store_grade_labels <- as.matrix(c("Student", "SIS User ID", "Score", "Page Number"))
+store_grades <- as.data.frame(store_grades);
+names(store_grades) <- store_grade_labels
+
+    # Downloadable csv of dataset ----
+    output$downloadScores <- downloadHandler(
+    filename = function() {
+        paste("StudentScores", Sys.Date(), ".csv", sep = "")
+        },
+        content = function(file) {
+        write.csv(store_grades, file, row.names = FALSE)
+        }
+    )
+
+if (num_versions==1) {
+  alerts_list <- rbind(blank_list,multiple_list)
+}
+
+if (num_versions>1) {
+  alerts_list = rbind(blank_list,multiple_list,no_form_list,wrong_form_list)
+}
+
+    output$downloadAlerts <- downloadHandler(
+    filename = function() {
+        paste("StudentAlerts", Sys.Date(), ".csv", sep = "")
+        },
+        content = function(file) {
+        write.csv(unlist(alerts_list), file, row.names = FALSE)
+        }
+    )
+
+    # --- DOWNLOADS ---
+    shinyjs::show("downloadData")
+    shinyjs::show("downloadScores")
+    shinyjs::show("downloadAlerts")
+
 
     if (length(fail_list)!=0){
     output$fail_list <- renderText(
