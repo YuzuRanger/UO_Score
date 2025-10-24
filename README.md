@@ -4,7 +4,7 @@ UO_Score_OMR.R: R script to identify and record answers from images of the UO Sc
 Grade_UO_Score_OMR.R: R script to produce scores and identify problematic student responses using output from UO_Score_OMR.R
 
 > [!TIP]
-> If you want to use the UO Score Application with a GUI, [go to DesktioDeployR UO Score instead](https://github.com/YuzuRanger/DesktopDeployR/tree/ScoreApp).
+> If you want to use the UO Score Application with a GUI, [go to DesktopDeployR UO Score instead](https://github.com/YuzuRanger/DesktopDeployR/tree/ScoreApp).
 
 ## Setting Up in VS Code
 ℹ️ Follow these steps: [R in Visual Studio Code](https://code.visualstudio.com/docs/languages/r)  
