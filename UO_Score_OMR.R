@@ -4,7 +4,6 @@
 
 # Clear Environment and Console
 rm(list = ls())
-cat(rep("\n", 100))
 
 # Load Libraries
 library(magick)
@@ -83,7 +82,6 @@ for (page_num in 1:num_forms) {
   
   image_pdftools <- pdf_convert(input_file_name_path, pages=page_num, filenames = "temp.png", dpi = 600)
   
-  cat(rep("\n", 100))
   print_update <- paste("Processing for", page_num, "of", num_forms)
   print(print_update)
   
@@ -126,7 +124,7 @@ for (page_num in 1:num_forms) {
     next
   }
   
-  # Identify possible position of guides
+  # Identify possible position of row guides
   all_dark <- which(gray_image_EBImage[col_min:col_max,1:H]<threshold)
   all_dark_coord <- matrix(NA, length(all_dark), 2)
   all_dark_coord[,1] <- (all_dark %/% W) + 1*((all_dark %% W)>0)
@@ -138,7 +136,7 @@ for (page_num in 1:num_forms) {
   
   all_dark_coord = all_dark_coord[(all_dark_coord[,1] %in% all_dark_row_counts[,1]),]
   
-  unique_row = unique(all_dark_coord[,1])
+  unique_row = unique(all_dark_coord[,1]) 
   
   if (length(unique_row)==0) {
     print_update <- paste("Wrong number of guides detected in form", page_num)
@@ -148,6 +146,7 @@ for (page_num in 1:num_forms) {
   }
 
   guide_mat_temp <- matrix(NA, length(unique(all_dark_coord[,1])), 4)
+
   
   num_guides=1
   
@@ -168,7 +167,7 @@ for (page_num in 1:num_forms) {
     guide_mat_temp[iter,4] = num_guides
     
   }
-  
+  # 61 for the 61 black grid marks
   if (num_guides != 61) {
     print_update <- paste("Wrong number of guides detected in form", page_num)
     fail_list = rbind(fail_list,print_update)
@@ -185,6 +184,7 @@ for (page_num in 1:num_forms) {
     guide_mat[iter,3] = fmode(sub_mat[,2])
     guide_mat[iter,4] = fmode(sub_mat[,3])
   }
+
   
   #  Mapping of Guides and Columns to Objects of Interest
   
@@ -405,6 +405,5 @@ if (length(fail_list)!=0){
 
 print_update1 <- paste("Processing Complete.", form_count, "forms attempted to be processed.")
 print_update2 <- paste("There were", form_count-successful_form_count, "forms unable to be processed.")
-cat(rep("\n", 100))
 print(print_update1)
 print(print_update2)
